@@ -34,8 +34,8 @@
 
 int ITE = 50;
 int nprocs, rank;
-int nzero, dist;
-float mb;
+int nZero, dist, maxValue;
+float mean, deviation, rx;
 
 void readinputs( int rank, std::string filename, std::vector<int> &sendsarray, std::vector<int> &recvcounts);
 template<typename T> T variance(const std::vector<T> &vec);
@@ -54,9 +54,9 @@ void my_sorting_nonblocking(char* sendbuf, int *sendcounts, int *sdispls,
 
 int run(int loopcount, std::vector<int>& sendsarray, std::vector<int>& recvcounts);
 
-void creat_randon_inputs(int nZero, int range, int maxValue, std::vector<int> &sendsarray, std::vector<int> &recvcounts);
-void creat_normal_distribution_inputs(int maxValue, std::vector<int> &sendsarray, std::vector<int> &recvcounts);
-void creat_Powerlaw_distribution_inputs(int maxValue, std::vector<int> &sendsarray, std::vector<int> &recvcounts);
+void creat_randon_inputs(int nZero, int range, std::vector<int> &sendsarray, std::vector<int> &recvcounts);
+void creat_normal_distribution_inputs(std::vector<int> &sendsarray, std::vector<int> &recvcounts);
+void creat_Powerlaw_distribution_inputs(std::vector<int> &sendsarray, std::vector<int> &recvcounts);
 
 
 // Main entry
@@ -67,10 +67,15 @@ int main(int argc, char **argv)
     //     exit(-1);
     // }
 
-    if (argc != 2) {
-        printf("Usage: %s <filename> \n", argv[0]);
+    if (argc != 7) {
+        printf("Usage: %s <Zero-ratio> <dist> <max_value> <mean> <deviation> <x> \n", argv[0]);
         exit(-1);
     }
+
+    // if (argc != 2) {
+    //     printf("Usage: %s <filename> \n", argv[0]);
+    //     exit(-1);
+    // }
 
     // MPI Initial
     if (MPI_Init(&argc, &argv) != MPI_SUCCESS)
@@ -81,10 +86,18 @@ int main(int argc, char **argv)
         printf("ERROR: MPI_Comm_rank error\n");
 
 	// input
-	std::string filename = argv[1];
+	// std::string filename = argv[1];
+	float p = atof(argv[1]);
+	nZero = p * nprocs; 
+	dist = atoi(argv[2]);
+	maxValue = atoi(argv[3]);
+	mean =  atof(argv[4]);
+	deviation =  atof(argv[5]);
+	rx =  atof(argv[6]);
+
 	std::vector<int> sendsarray;
 	std::vector<int> recvcounts;
-	readinputs(rank, filename, sendsarray, recvcounts);
+	// readinputs(rank, filename, sendsarray, recvcounts);
 
 	// float p = atof(argv[1]);
 	// mb = atof(argv[2]);
@@ -97,27 +110,33 @@ int main(int argc, char **argv)
 	//     creat_randon_inputs(nzero, range, maxValue, sendsarray, recvcounts);
 	// }
 
-	// if (dist == 1) {
-	// 	creat_normal_distribution_inputs(maxValue, sendsarray, recvcounts);
-	// }
+	if (dist == 1) {
+		creat_normal_distribution_inputs(sendsarray, recvcounts);
+	}
 
-	// // Power law distribution
-	// if (dist == 2)
-	// {
-	// 	creat_Powerlaw_distribution_inputs(maxValue, sendsarray, recvcounts);
-	// }
+	// Power law distribution
+	if (dist == 2)
+	{
+		creat_Powerlaw_distribution_inputs(sendsarray, recvcounts);
+	}
 
-	std::vector<int> send_diff, recv_diff;
-	double send_vari = calculate_variance(sendsarray, rank, send_diff);
-	double send_stdDev = sqrt(send_vari);
+	std::cout << "Send " << rank << " " << nprocs << " " << dist << " " << nZero << " " << maxValue << " " << mean << " " << deviation << " " << rx << " ";
+	for (int i = 0; i < nprocs; i++){
+		std::cout << sendsarray[i] << " ";
+	}
+	std::cout << std::endl;
 
-	double recv_vari = calculate_variance(recvcounts, rank, recv_diff);
-	double recv_stdDev = sqrt(recv_vari);
+	// std::vector<int> send_diff, recv_diff;
+	// double send_vari = calculate_variance(sendsarray, rank, send_diff);
+	// double send_stdDev = sqrt(send_vari);
 
-    std::cout <<  "INFO--" << rank << ", " << nzero << ", " << mb << ", " << send_stdDev << ", " << recv_stdDev << ", " << dist << std::endl; 
-    // for (int i = 0; i < nprocs; i++) {
-    // 	std::cout << rank << ", " << i << ", " << send_diff[i] << ", " << recv_diff[i] << std::endl;
-    // }
+	// double recv_vari = calculate_variance(recvcounts, rank, recv_diff);
+	// double recv_stdDev = sqrt(recv_vari);
+
+    // std::cout <<  "INFO--" << rank << ", " << nzero << ", " << mb << ", " << send_stdDev << ", " << recv_stdDev << ", " << dist << std::endl; 
+    // // for (int i = 0; i < nprocs; i++) {
+    // // 	std::cout << rank << ", " << i << ", " << send_diff[i] << ", " << recv_diff[i] << std::endl;
+    // // }
 
  	// run(comm_mode, 20, sendsarray, recvcounts, 1); // warm-up
  	run(20, sendsarray, recvcounts);
@@ -163,7 +182,7 @@ int run(int loopcount, std::vector<int>& sendsarray, std::vector<int>& recvcount
     	double max_time = 0;
     	MPI_Allreduce(&comm_time_1, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     	if (max_time == comm_time_1)
-	    	std::cout << "TIME-0, " << rank << ", " << comm_time_1 << ", " << send_tsize << ", " <<  recv_tsize << ", " << max_sendn << ", " << max_recvn << ", " << nzero << ", " << mb << ", " << dist << std::endl;
+	    	std::cout << "TIME-0, " << rank << " " << comm_time_1 << " " << send_tsize << " " <<  recv_tsize << " " << nZero << " " << dist << " " << maxValue << " " << mean << " " << deviation << " " << rx << " " << std::endl;
 	    MPI_Barrier(MPI_COMM_WORLD);
 
     	// else if (comm_mode == 1) {
@@ -181,7 +200,7 @@ int run(int loopcount, std::vector<int>& sendsarray, std::vector<int>& recvcount
     	max_time = 0;
     	MPI_Allreduce(&comm_time_2, &max_time, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
     	if (max_time == comm_time_2)
-	    	std::cout << "TIME-3, " << rank << ", " << comm_time_2 << ", " << send_tsize << ", " <<  recv_tsize << ", " << max_sendn << ", " << max_recvn << ", " << nzero << ", " << mb << std::endl;
+	    	std::cout << "TIME-3, " << rank << " " << comm_time_2 << " " << send_tsize << " " <<  recv_tsize << " " << nZero << " " << dist << " " << maxValue << " " << mean << " " << deviation << " " << rx << " " << std::endl;
 	    MPI_Barrier(MPI_COMM_WORLD);
 
     	// }
@@ -351,17 +370,20 @@ void creat_randon_inputs(int nZero, int range, int maxValue, std::vector<int> &s
 	// }
 }
 
-void creat_normal_distribution_inputs(int maxValue, std::vector<int> &sendsarray, std::vector<int> &recvcounts) {
-
+void creat_normal_distribution_inputs(std::vector<int> &sendsarray, std::vector<int> &recvcounts) {
 
 	std::default_random_engine generator;
-	std::normal_distribution<double> distribution(nprocs/2, nprocs/3); // set mean and deviation
+	std::normal_distribution<double> distribution(mean, deviation); // set mean and deviation, nprocs/2, nprocs/3
+
+	for (int i = 0; i < nZero; i++) {
+		sendsarray.push_back(0);
+	}
 
 	while(true)
 	{
 		sendsarray.resize(nprocs);
 		int p = int(distribution(generator));
-		if (p >= 0 && p < nprocs) {
+		if (p >= nZero && p < nprocs) {
 			if (++sendsarray[p] >= maxValue) break;
 		}
 	}
@@ -374,13 +396,18 @@ void creat_normal_distribution_inputs(int maxValue, std::vector<int> &sendsarray
 
 }
 
-void creat_Powerlaw_distribution_inputs(int maxValue, std::vector<int> &sendsarray, std::vector<int> &recvcounts) {
+void creat_Powerlaw_distribution_inputs(std::vector<int> &sendsarray, std::vector<int> &recvcounts) {
 	double x = (double)maxValue;
 
 	sendsarray.resize(nprocs);
-	for (int i=0; i <nprocs; ++i) {
+
+	for (int i = 0; i < nZero; i++) {
+		sendsarray.push_back(0);
+	}
+
+	for (int i = nZero; i < nprocs; ++i) {
 		sendsarray[i] = (int)x;
-		x = x * 0.999;
+		x = x * rx; // 0.999
 	}
 
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
