@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
     int loopCount = atoi(argv[1]);
     int sorted = atoi(argv[2]);
 
- 	run(20, 1, 0); // warm-up
+// 	run(20, 1, 0); // warm-up
  	run(loopCount, 0, sorted);
 
 
@@ -80,7 +80,7 @@ int run(int loopcount, int warmup, int m) {
 
 	for (int i = 0; i < nprocs; i++) {
 		int id = (rank - i + nprocs) % nprocs;
-		int v = pow(4, id);
+		int v = 100 * id;
 		if ( v > INT_MAX ) { v = INT_MAX; }
 		sendcounts[i] = v;
 	}
@@ -169,8 +169,8 @@ void my_spreadout_nonblocking(char* sendbuf, int *sendcounts, int *sdispls,
 		int dst = (rank + i) % nprocs;
 		MPI_Isend(&sendbuf[sdispls[dst]], sendcounts[dst], MPI_CHAR, dst, 0, MPI_COMM_WORLD, &req[i+nprocs]);
 
-//		if (i == 2)
-//			std::cout << "send: " << rank << ", " << dst << ", " << sendcounts[dst] << std::endl;
+		if (i == 2)
+			std::cout << "send: " << rank << ", " << dst << ", " << sendcounts[dst] << std::endl;
 	}
 
 	MPI_Waitall(2*nprocs, req, stat);
